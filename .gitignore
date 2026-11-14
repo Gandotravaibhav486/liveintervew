@@ -1,0 +1,12 @@
+node_modules/
+.env
+.env.*
+!.env.example
+.DS_Store
+# Real students' faces and speech - never commit.
+/corpus/frames/
+/corpus/cases.json
+/corpus/*.json
+# Run outputs
+results/
+*.jsonl

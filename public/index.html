@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Interview scoring: local vs hosted</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --border: #262b36; --text: #e6e9ef;
+    --muted: #98a1b3; --accent: #6ea8fe; --good: #4ade80; --warn: #fbbf24; --bad: #f87171;
+  }
+  @media (prefers-color-scheme: light) {
+    :root { --bg:#f7f8fa; --panel:#fff; --border:#e2e5ea; --text:#1a1d23; --muted:#5c6472; --accent:#2563eb; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; padding:24px; background:var(--bg); color:var(--text);
+    font:14px/1.5 ui-sans-serif,-apple-system,"SF Pro Text",system-ui,sans-serif; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  .sub { color:var(--muted); font-size:13px; margin-bottom:20px; }
+  .layout { display:grid; grid-template-columns:340px 1fr; gap:20px; align-items:start; }
+  @media (max-width:900px){ .layout{ grid-template-columns:1fr; } }
+  .panel { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  label { display:block; font-size:12px; color:var(--muted); margin:10px 0 4px; text-transform:uppercase; letter-spacing:.04em; }
+  select, button { font:inherit; color:var(--text); background:var(--bg);
+    border:1px solid var(--border); border-radius:7px; padding:8px 10px; width:100%; }
+  button { cursor:pointer; background:var(--accent); color:#fff; border:none; font-weight:600; margin-top:12px; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .checks { display:flex; flex-direction:column; gap:7px; margin-top:6px; }
+  .checks label { display:flex; align-items:center; gap:8px; text-transform:none;
+    letter-spacing:0; font-size:13px; color:var(--text); margin:0; cursor:pointer; }
+  .checks input { width:auto; }
+  .meta { font-size:12px; color:var(--muted); margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+  .meta div { margin-bottom:3px; }
+  .frames { display:flex; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .frames img { width:74px; height:56px; object-fit:cover; border-radius:5px; border:1px solid var(--border); }
+  .frames .capped { outline:2px solid var(--accent); outline-offset:1px; }
+  textarea { width:100%; font:12px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--text);
+    background:var(--bg); border:1px solid var(--border); border-radius:7px; padding:9px; resize:vertical; }
+  textarea:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .note { font-size:11px; color:var(--muted); margin-top:6px; line-height:1.45; }
+  details { margin-top:10px; }
+  summary { font-size:12px; color:var(--muted); cursor:pointer; }
+  .dirty { color:var(--warn); }
+  .results { display:grid; gap:14px; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); }
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:10px; padding:14px; }
+  .card h3 { margin:0 0 2px; font-size:14px; }
+  .card .stats { font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .row { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:4px 0; }
+  .row .name { font-size:12px; color:var(--muted); }
+  .row .val { font-variant-numeric:tabular-nums; font-weight:600; }
+  .bar { height:5px; background:var(--border); border-radius:3px; overflow:hidden; margin-bottom:6px; }
+  .bar span { display:block; height:100%; background:var(--accent); }
+  .overall { border-top:1px solid var(--border); margin-top:8px; padding-top:8px; font-size:16px; }
+  .fb { font-size:12px; color:var(--muted); margin-top:10px; white-space:pre-wrap;
+    max-height:260px; overflow-y:auto; border-top:1px solid var(--border); padding-top:8px; }
+  .err { color:var(--bad); font-size:12px; }
+  .pending { color:var(--muted); font-size:12px; }
+  table.cmp { width:100%; border-collapse:collapse; margin-top:16px; font-size:13px; }
+  table.cmp th, table.cmp td { text-align:right; padding:6px 8px; border-bottom:1px solid var(--border); font-variant-numeric:tabular-nums; }
+  table.cmp th:first-child, table.cmp td:first-child { text-align:left; color:var(--muted); }
+  .wrap { overflow-x:auto; }
+</style>
+</head>
+<body>
+<h1>Interview scoring — local vs hosted</h1>
+<div class="sub">Same prompt, same tool schema, same frames. Real corpus, localhost only.</div>
+
+<div class="layout">
+  <div class="panel">
+    <label for="case">Case</label>
+    <select id="case"></select>
+
+    <label>Models</label>
+    <div class="checks" id="runners">
+      <label><input type="checkbox" value="sonnet" checked> Sonnet 5 (hosted)</label>
+      <label><input type="checkbox" value="opus"> Opus 5 (hosted)</label>
+      <label><input type="checkbox" value="glimmer-4bit"> Glimmer Q4_K_XL (local)</label>
+      <label><input type="checkbox" value="glimmer-3bit" checked> Glimmer Q3_K_XL (local)</label>
+    </div>
+
+    <label>Transcript preset</label>
+    <select id="preset">
+      <option value="">— use the case's real transcript —</option>
+    </select>
+    <div class="note" id="presetNote"></div>
+
+    <button id="run">Score</button>
+
+    <div class="meta" id="meta"></div>
+    <div class="frames" id="frames"></div>
+
+    <label style="margin-top:14px">Transcript <span id="editHint" style="text-transform:none;letter-spacing:0">(editable)</span></label>
+    <textarea id="transcript" rows="9"></textarea>
+    <details>
+      <summary>Question &amp; reference answer</summary>
+      <label>Question</label>
+      <textarea id="questionText" rows="3"></textarea>
+      <label>Reference answer</label>
+      <textarea id="referenceAnswer" rows="5"></textarea>
+    </details>
+  </div>
+
+  <div>
+    <div class="results" id="results"></div>
+    <div class="wrap"><table class="cmp" id="cmp" hidden></table></div>
+  </div>
+</div>
+
+<script>
+const PARAMS = [
+  ["content_relevance","Content & Structure",.25],
+  ["delivery_confidence","Delivery & Confidence",.20],
+  ["communication_clarity","Clarity & Fluency",.20],
+  ["professionalism_appearance","Attire & Professionalism",.15],
+  ["body_language","Posture & Body Language",.20],
+];
+const $ = (id) => document.getElementById(id);
+let current = null;
+let presets = [];
+const results = {};
+
+// An override is sent only when the editable fields no longer match the
+// case's stored values - so "score the real corpus case" stays the default
+// and can't be silently altered by a stray keystroke.
+function buildOverride() {
+  if (!current) return null;
+  const t = $("transcript").value, q = $("questionText").value, r = $("referenceAnswer").value;
+  const changed = t !== current.transcript || q !== current.question_text || r !== current.reference_answer;
+  $("editHint").className = changed ? "dirty" : "";
+  $("editHint").textContent = changed ? "(edited — scoring your text)" : "(editable)";
+  return changed ? { transcript: t, questionText: q, referenceAnswer: r } : null;
+}
+
+async function loadCases() {
+  const cases = await (await fetch("/api/cases")).json();
+  cases.sort((a,b) => b.frame_count - a.frame_count);
+  $("case").innerHTML = cases.map(c =>
+    `<option value="${c.answer_id}">${c.frame_count ? "🖼 "+c.frame_count : "📝 text"} · ${c.subject} · ${c.transcript_length}ch</option>`
+  ).join("");
+  await selectCase();
+}
+
+async function selectCase() {
+  const id = $("case").value;
+  current = await (await fetch("/api/case?id="+id)).json();
+  $("meta").innerHTML = `
+    <div><b>${current.subject}</b> · ${current.mode} mode</div>
+    <div>${current.frame_files.length} frames · ${current.transcript_length} char transcript</div>
+    <div style="margin-top:6px;color:var(--muted)">${current.question_text.slice(0,220)}${current.question_text.length>220?"…":""}</div>`;
+  $("frames").innerHTML = current.frame_files.map((f,i) =>
+    `<img src="/api/frame/${id}/${f}" class="${i<4?"capped":""}" title="${i<4?"sent to local models (4-frame cap)":"hosted models only"}">`
+  ).join("");
+  $("transcript").value = current.transcript;
+  $("questionText").value = current.question_text;
+  $("referenceAnswer").value = current.reference_answer;
+  $("preset").value = "";
+  $("presetNote").textContent = "";
+  buildOverride();
+  $("results").innerHTML = "";
+  $("cmp").hidden = true;
+  for (const k in results) delete results[k];
+}
+
+function card(runner, label, body) {
+  let el = document.getElementById("card-"+runner);
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "card";
+    el.id = "card-"+runner;
+    $("results").appendChild(el);
+  }
+  el.innerHTML = `<h3>${label}</h3>${body}`;
+}
+
+function renderResult(runner, label, r) {
+  const rows = PARAMS.map(([k,name]) => {
+    const s = r.scoreBreakdown[k].score;
+    return `<div class="row"><span class="name">${name}</span><span class="val">${s}</span></div>
+            <div class="bar"><span style="width:${s}%"></span></div>`;
+  }).join("");
+  const stats = [
+    `${(r.latencyMs/1000).toFixed(1)}s`,
+    r.promptTokens ? `${r.promptTokens} in` : "",
+    r.completionTokens ? `${r.completionTokens} out` : "",
+    r.reasoningTokens ? `${r.reasoningTokens} reasoning` : "",
+    r.finishReason ? `finish: ${r.finishReason}` : "",
+  ].filter(Boolean).join(" · ");
+  card(runner, label,
+    `<div class="stats">${stats}</div>${rows}
+     <div class="row overall"><span class="name">Weighted overall</span><span class="val">${r.overallScore}</span></div>
+     <div class="fb">${r.feedback.replace(/</g,"&lt;")}</div>`);
+}
+
+function renderCmp() {
+  const keys = Object.keys(results);
+  if (keys.length < 2) { $("cmp").hidden = true; return; }
+  const head = `<tr><th>Parameter</th>${keys.map(k=>`<th>${results[k].label.split(" (")[0]}</th>`).join("")}<th>spread</th></tr>`;
+  const body = [...PARAMS.map(([k,name]) => {
+    const vals = keys.map(rk => results[rk].result.scoreBreakdown[k].score);
+    const spread = Math.max(...vals) - Math.min(...vals);
+    return `<tr><td>${name}</td>${vals.map(v=>`<td>${v}</td>`).join("")}<td style="color:${spread>15?"var(--bad)":spread>8?"var(--warn)":"var(--good)"}">${spread}</td></tr>`;
+  }),
+  (() => {
+    const vals = keys.map(rk => results[rk].result.overallScore);
+    const spread = Math.max(...vals)-Math.min(...vals);
+    return `<tr><td><b>Weighted overall</b></td>${vals.map(v=>`<td><b>${v}</b></td>`).join("")}<td><b>${spread}</b></td></tr>`;
+  })(),
+  (() => {
+    const vals = keys.map(rk => (results[rk].result.latencyMs/1000).toFixed(1)+"s");
+    return `<tr><td>Latency</td>${vals.map(v=>`<td>${v}</td>`).join("")}<td></td></tr>`;
+  })()].join("");
+  $("cmp").innerHTML = head + body;
+  $("cmp").hidden = false;
+}
+
+async function run() {
+  const chosen = [...document.querySelectorAll("#runners input:checked")].map(i => i.value);
+  if (!chosen.length) return;
+  $("run").disabled = true;
+  $("results").innerHTML = "";
+  for (const k in results) delete results[k];
+
+  chosen.forEach(r => card(r, r, `<div class="pending">running…</div>`));
+
+  // Sequential on purpose: two local models sharing one 24GB machine must
+  // not be in flight at the same time.
+  for (const runner of chosen) {
+    try {
+      const res = await fetch("/api/score", {
+        method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ caseId: current.answer_id, runner, override: buildOverride() })
+      });
+      const data = await res.json();
+      if (data.error) { card(runner, data.label || runner, `<div class="err">${data.error}</div>`); continue; }
+      results[runner] = data;
+      renderResult(runner, data.label, data.result);
+      renderCmp();
+    } catch (e) {
+      card(runner, runner, `<div class="err">${e.message}</div>`);
+    }
+  }
+  $("run").disabled = false;
+}
+
+async function loadPresets() {
+  presets = await (await fetch("/api/presets")).json();
+  $("preset").innerHTML = `<option value="">— use the case's real transcript —</option>` +
+    presets.map(p => `<option value="${p.id}">${p.label}</option>`).join("");
+}
+
+$("preset").addEventListener("change", () => {
+  const p = presets.find(x => x.id === $("preset").value);
+  if (!p) { $("presetNote").textContent = ""; selectCase(); return; }
+  $("transcript").value = p.transcript;
+  $("questionText").value = p.questionText;
+  $("referenceAnswer").value = p.referenceAnswer;
+  $("presetNote").textContent = p.note;
+  buildOverride();
+});
+
+["transcript","questionText","referenceAnswer"].forEach(id =>
+  $(id).addEventListener("input", buildOverride));
+$("case").addEventListener("change", selectCase);
+$("run").addEventListener("click", run);
+loadPresets();
+loadCases();
+</script>
+</body>
+</html>
